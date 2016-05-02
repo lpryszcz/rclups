@@ -69,7 +69,7 @@ def get_coords(arg):
         c[a2i[aa]]   += 1
     # DFT
     A = [np.fft.fft(_a) for _a in a]
-    # PS 
+    # PS: only the first half : 
     PS = [np.abs(_A[1:(len(seq)+1)/2])**2 for _A in A] #; print PS.shape
     # normalised moments
     MV = []
@@ -95,7 +95,7 @@ def fasta_generator(files, verbose):
         seq = "".join(seqs)
         name += "_%s"%len(seq)
         yield name, seq
-    
+        
 def fasta2clusters(files, out, nproc, dendrogram, verbose):
     """Report clusters"""
     if verbose:
@@ -131,7 +131,8 @@ def fasta2clusters(files, out, nproc, dendrogram, verbose):
         sys.stderr.write('%s entries processed!\n'%i)
 
     if dendrogram:
-        Z = hierarchy.linkage(ytdist) # centroid complete linkage(, 'single')
+        # UPGMA http://docs.scipy.org/doc/scipy-0.17.0/reference/generated/scipy.cluster.hierarchy.linkage.html
+        Z = hierarchy.linkage(ytdist, method='average', metric='euclidean') 
         plt.figure()
         dn = hierarchy.dendrogram(Z, labels=labels, orientation='right')
         plt.show()
