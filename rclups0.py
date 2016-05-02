@@ -70,7 +70,7 @@ def get_coords(arg):
     # DFT
     A = [np.fft.fft(_a) for _a in a]
     # PS: only the first half : 
-    PS = [np.abs(_A[1:(len(seq)+1)/2])**2 for _A in A] #; print PS.shape
+    PS = [np.abs(_A[1:(len(seq))/2])**2 for _A in A] #; print PS.shape
     # normalised moments
     MV = []
     for i, ps in enumerate(PS):
