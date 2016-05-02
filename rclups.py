@@ -16,6 +16,10 @@ from multiprocessing import Pool
 from scipy.cluster import hierarchy
 import matplotlib.pyplot as plt
 
+aa2i = {'A': 0, 'R': 1, 'N': 2, 'D': 3, 'C': 4, 'Q': 5, 'E': 6, 'G': 7, 'H': 8, 'I': 9, 'L': 10, 'K': 11, 'M': 12, 'F': 13, 'P': 14, 'S': 15, 'T': 16, 'W': 17, 'Y': 18, 'V': 19}
+dna2i = {'A': 0, 'C': 1, 'G': 2, 'T': 3}
+a2i = aa2i #dna2i
+
 # Grantham R (1974) Science 185:862-864.
 Polarity = {'A': 8.1, 'R': 10.5, 'N': 11.6, 'D': 13.0, 'C': 5.5, 'Q': 10.5, 'E': 12.3, 'G': 9.0, 'H': 10.4, 'I': 5.2, 'L': 4.9, 'K': 11.3, 'M': 5.7, 'F': 5.2, 'P': 8.0, 'S': 9.2, 'T': 8.6, 'W': 5.4, 'Y': 6.2, 'V': 5.9}
 Volume   = {'A': 31.0, 'R': 124.0, 'N': 56.0, 'D': 54.0, 'C': 55.0, 'Q': 85.0, 'E': 83.0, 'G': 3.0, 'H': 96.0, 'I': 111.0, 'L': 111.0, 'K': 119.0, 'M': 105.0, 'F': 132.0, 'P': 32.5, 'S': 32.0, 'T': 61.0, 'W': 170.0, 'Y': 136.0, 'V': 84.0}
@@ -36,17 +40,44 @@ def get_power_spectrum(seq, features):
     # PS
     ## Get the first half of the transform (since it's symmetric) - make sure it's good
     PS = np.abs(A[1:(len(seq)+1)/2])**2
+    #PS = np.sum(PS) #/len(seq)
+    PS = [len(seq)*np.sum(PS**j)/len(seq)**j for j in range(1,4)]
     return PS
 
-def get_coords(arg):
+def get_coords0(arg):
     """Return x, y coordinates for given sequence"""
     name, seq = arg
     x = get_power_spectrum(seq, polarity)
     y = get_power_spectrum(seq, volume)
-    #z = get_power_spectrum(seq, transmembrane)
-    #return name, (np.sum(x)/len(seq), np.sum(y)/len(seq))#, np.sum(z)/len(seq)
-    return name, (np.sum(x), np.sum(y))#, np.sum(z)
+    z = get_power_spectrum(seq, transmembrane)
+    return name, x + y + z
 
+def get_coords(arg):
+    """Alternative approach
+    
+    Hoang (2015) A new method to cluster DNA sequences using Fourier power spectrum
+    """
+    name, seq = arg
+    a = np.zeros((len(a2i), len(seq)), dtype=int)
+    c = np.zeros(len(a2i))
+    for i, aa in enumerate(seq):
+        if aa not in a2i:
+            continue
+        # update
+        a[a2i[aa]][i] = 1
+        c[a2i[aa]]   += 1
+    # DFT
+    A = [np.fft.fft(_a) for _a in a]
+    # PS _A[1:(len(seq)+1)/2]
+    PS = [np.abs(_A)**2 for _A in A] #; print PS.shape
+    # normalised moments
+    MV = []
+    for i, ps in enumerate(PS):
+        for j in range(1, 4):
+            mv = c[i]*(len(seq)-c[i])*np.sum(ps**j)/(c[i]**j*((len(seq)-c[i])**j))
+            MV.append(mv)
+    return name, MV
+    
 def fasta_generator(handle):
     """Return entry id and sequence"""
     for r in SeqIO.parse(handle, 'fasta'):
@@ -72,6 +103,17 @@ def fasta2clusters(handle, out, nproc, dendrogram, verbose):
         # report
         out.write("%s\t%s\n"%(name, "\t".join(map(str, coords))))
 
+    # report distances
+    dists = np.zeros((i,i))
+    for i1 in range(i-1):
+        v1 = np.array(ytdist[i1])#; print len(v1)
+        for i2 in range(i1, i):
+            v2 = np.array(ytdist[i2])
+            d = np.linalg.norm(v1-v2)
+            dists[i1][i2] = d
+            dists[i2][i1] = d
+    np.savetxt('out.txt', dists, delimiter='\t', header='\t'.join(labels))
+            
     if verbose:
         sys.stderr.write('%s entries processed!\n'%i)
 
