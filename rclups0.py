@@ -18,6 +18,7 @@ import matplotlib.pyplot as plt
 
 aa2i = {'A': 0, 'R': 1, 'N': 2, 'D': 3, 'C': 4, 'Q': 5, 'E': 6, 'G': 7, 'H': 8, 'I': 9, 'L': 10, 'K': 11, 'M': 12, 'F': 13, 'P': 14, 'S': 15, 'T': 16, 'W': 17, 'Y': 18, 'V': 19}
 dna2i = {'A': 0, 'C': 1, 'G': 2, 'T': 3, 'a': 0, 'c': 1, 'g': 2, 't': 3}
+a2i = aa2i
 a2i = dna2i
 bases = len(set(a2i.values()))
 
@@ -77,7 +78,7 @@ def get_coords(arg):
         for j in range(1, 4):
             mv = c[i]*(len(seq)-c[i])*np.sum(ps**j)/(c[i]**j*((len(seq)-c[i])**j))
             MV.append(mv)
-    return name, MV
+    return name, np.array(MV), len(seq)
     
 def fasta_generator(files, verbose):
     """Return entry id and sequence"""
@@ -104,17 +105,21 @@ def fasta2clusters(files, out, nproc, dendrogram, verbose):
     iterator = fasta_generator(files, verbose)
     # start pool of processes
     p = Pool(nproc)
-    ytdist, labels = [], []
-    for i, (name, coords) in enumerate(p.imap(get_coords, iterator), 1):
+    mvs, labels, seqlens = [], [], []
+    for i, (name, coords, seqlen) in enumerate(p.imap(get_coords, iterator), 1):
         #if verbose and not i%1000:
         sys.stderr.write(' %s %s       \n'%(i, name))
         #fields = name.split()
         #name = " ".join((fields[0].split('_')[-1], fields[1].split(':')[-1], fields[4].split(':')[-1]))
         # store
         labels.append(name)
-        ytdist.append(coords)
+        mvs.append(coords)
+        seqlens.append(seqlen)
         # report
         out.write("%s\t%s\n"%(name, "\t".join(map(str, coords))))
+
+    maxlen = max(seqlens)
+    ytdist = [1/(maxlen*x) for x in mvs]
 
     # report distances
     dists = np.zeros((i,i))
