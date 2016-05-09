@@ -75,11 +75,11 @@ def get_coords(arg):
     PS = [np.abs(_A[1:])**2 for _A in A]#; print PS[-1].shape
     # normalised moments
     MV = []
-    for i, ps in enumerate(PS):
-        for j in range(1, 4):
+    for j in range(1, 4):
+        for i, ps in enumerate(PS):
             mv = c[i]*(len(seq)-c[i])*np.sum(ps**j)/(c[i]**j*(len(seq)-c[i])**j)
             MV.append(mv)
-    print MV[-1]
+    #print MV
     return name, np.array(MV), len(seq)
     
 def fasta_generator_multi(files, verbose):
@@ -115,24 +115,24 @@ def fasta2clusters(files, out, nproc, dendrogram, verbose):
         sys.stderr.write('Parsing %s input(s)...\n'%len(files))
     # get iterator
     if len(files)>1:
-        iterator = fasta_generator_mulit(files, verbose)
+        iterator = fasta_generator_multi(files, verbose)
     else:
         iterator = fasta_generator(files[0], verbose)
     # start pool of processes
     p = Pool(nproc)
     mvs, labels, seqlens = [], [], []
-    for i, (name, coords, seqlen) in enumerate(p.imap(get_coords, iterator), 1):
+    for i, (name, mv, seqlen) in enumerate(p.imap(get_coords, iterator), 1):
         #if verbose and not i%1000:
         sys.stderr.write(' %s %s       \n'%(i, name))
         #fields = name.split()
         #name = " ".join((fields[0].split('_')[-1], fields[1].split(':')[-1], fields[4].split(':')[-1]))
         # store
         labels.append(name)
-        mvs.append(coords)
+        mvs.append(mv)
         seqlens.append(seqlen)
 
     maxlen = max(seqlens)
-    ytdist = [1/(maxlen*x) for x in mvs]
+    ytdist = [1.0/maxlen*x for x in mvs]
     for i, mv in enumerate(ytdist):
         name = labels[i/3]
         # report
