@@ -69,18 +69,20 @@ def get_coords(arg):
         a[a2i[aa]][i] = 1
         c[a2i[aa]]   += 1
     # DFT
-    A = [np.fft.fft(_a) for _a in a]
-    # PS: only the first half : 
-    PS = [np.abs(_A[1:(len(seq))/2])**2 for _A in A] #; print PS.shape
+    A = [np.fft.fft(_a) for _a in a]#; print len(A)
+    # exclude first term
+    # PS: only the first half : _A[1:(len(seq))/2]
+    PS = [np.abs(_A[1:])**2 for _A in A]#; print PS[-1].shape
     # normalised moments
     MV = []
     for i, ps in enumerate(PS):
         for j in range(1, 4):
-            mv = c[i]*(len(seq)-c[i])*np.sum(ps**j)/(c[i]**j*((len(seq)-c[i])**j))
+            mv = c[i]*(len(seq)-c[i])*np.sum(ps**j)/(c[i]**j*(len(seq)-c[i])**j)
             MV.append(mv)
+    print MV[-1]
     return name, np.array(MV), len(seq)
     
-def fasta_generator(files, verbose):
+def fasta_generator_multi(files, verbose):
     """Return entry id and sequence"""
     for i, handle in enumerate(files, 1):
         if verbose:
@@ -97,12 +99,25 @@ def fasta_generator(files, verbose):
         name += "_%s"%len(seq)
         yield name, seq
         
+def fasta_generator(handle, verbose):
+    """Return entry id and sequence"""
+    if handle.name.endswith('.gz'):
+        handle = gzip.open(handle.name)
+    for r in SeqIO.parse(handle, 'fasta'):
+        seq  = str(r.seq)
+        name = r.id
+        name += "_%s"%len(seq)
+        yield name, seq
+        
 def fasta2clusters(files, out, nproc, dendrogram, verbose):
     """Report clusters"""
     if verbose:
         sys.stderr.write('Parsing %s input(s)...\n'%len(files))
     # get iterator
-    iterator = fasta_generator(files, verbose)
+    if len(files)>1:
+        iterator = fasta_generator_mulit(files, verbose)
+    else:
+        iterator = fasta_generator(files[0], verbose)
     # start pool of processes
     p = Pool(nproc)
     mvs, labels, seqlens = [], [], []
@@ -115,11 +130,14 @@ def fasta2clusters(files, out, nproc, dendrogram, verbose):
         labels.append(name)
         mvs.append(coords)
         seqlens.append(seqlen)
-        # report
-        out.write("%s\t%s\n"%(name, "\t".join(map(str, coords))))
 
     maxlen = max(seqlens)
     ytdist = [1/(maxlen*x) for x in mvs]
+    for i, mv in enumerate(ytdist):
+        name = labels[i/3]
+        # report
+        j = i%3 + 1
+        out.write("%s\t%s\t%s\n"%(name, j, "\t".join(map(str, mv))))
 
     # report distances
     dists = np.zeros((i,i))
